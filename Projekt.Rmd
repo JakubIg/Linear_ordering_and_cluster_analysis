@@ -1,0 +1,458 @@
+---
+title: "Porz¹dkowanie liniowe i analiza skupieñ"
+author: "Jakub Ignatik"
+date: "10 grudnia 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#Rozdzia³ I: Ranking obiektów
+###Wprowadzenie
+
+Celem tej czêœci projektu bêdzie przedstawienie rankingu polskich miast najbardziej przyjaznych rowerzystom.  
+**Dane: **Dane pochodz¹ z magazynu rowerowego "Rowertour" (11/2018), gdzie zosta³ przedstawiony ranking miast najbardziej przyjaznych rowerzystom. Jednak ranking tam przedstawiony jest doœæ subiektywny, bior¹c pod uwagê opinie organizacji rowerowych (np. brak takiej opinii obni¿a maksymaln¹ liczbê punktów do zdobycia za kategoriê o 1/3), a tak¿e stosuje dla kategorii oceniaj¹cej ³¹czn¹ d³ugoœæ DIR skalê otwart¹, przez co powstaje spora ró¿nica pomiêdzy miastami, rzutuj¹ca na ranking.  
+Jeœli chodzi o iloœæ miast, dla których wykonywany bêdzie ranking, postanowi³em pozostawiæ oryginaln¹ ich liczbê - 39, co nie odbiega sporo od wymienionej w zadaniu liczby 30.  
+**Metodologia: **Zmuszony jestem ograniczyæ liczbê zmiennych, których w danych mo¿na naliczyæ doœæ sporo. Analizê ograniczê do drogowej infrastruktury rowerowej (DIR), w sk³ad której wchodz¹ nastêpuj¹ce zmienne (s - stymulanta, d - destymulanta):  
+-*DIR.lacznie:* £¹czna d³ugoœæ DIR (s)  
+-*DIR.asfalt:* D³ugoœæ DIR o powierzchni asfaltowej (s)  
+-*DIR.kostka:* D³ugoœæ DIR o powierzchni z kostki/p³yt chodnikowych (d)  
+-*DIR.inne:* D³ugoœæ DIR o innej powierzchni (d)  
+-*Pasy.ruchu:* £¹czna d³ugoœæ pasów ruchu dla rowerów (s)  
+-*Drogi.row.lacznie:* £¹czna d³ugoœæ dróg dla rowerów (s)  
+-*Drogi.row.asfalt:* D³ugoœæ dróg dla rowerów o powierzchni asfaltowej (s)  
+-*Ciagi.lacznie:* £¹czna d³ugoœæ ci¹gów pieszo-rowerowych (d)  
+-*Ciagi.asfalt:* D³ugoœæ ci¹gów pieszo-rowerowych o powierzchni asfaltowej (s)  
+Ranking wykonam trzema metodami: metod¹ Hellwiga, metod¹ standaryzowanych sum oraz metod¹ sumy rang.  
+
+###Wprowadzenie danych oraz ich obróbka
+
+Oprócz zmiennych, które bêd¹ braæ udzia³ w tworzeniu rankingu (jednostka: km), wprowadzê te¿ liczbê mieszkañców (w tys.) oraz d³ugoœæ dróg publicznych(w km).  
+```{r}
+Bialystok <- c(297.3,426,124,103.6,19.6,0.8,0,102.2,87.4,21.8,16.2)
+Bielsko_Biala <- c(171.5,589.1,30.2,26.2,3,1,0.73,15.7,15.7,13.7,12)
+Bydgoszcz <- c(352.3,827.5,86.7,44.7,28.3,12,0.6,31.3,20.1,53.1,24.5)
+Bytom <- c(168.4,211,15.5,9.7,4.9,0.3,0,4.3,4.3,7.3,1.8)
+Chorzow <- c(109,137,51,38.1,12.9,0,0,5.5,5.5,12,5)
+Czestochowa <- c(224.4,653,75.6,36.9,38,0.7,5.7,26.6,24.1,43.3,7.1)
+Dabrowa_Gornicza <- c(121.1,398,30.8,22.9,7.9,0,2.5,15.3,13,10,4.4)
+Elblag <- c(120.9,219.1,45.1,6.5,38.6,0,1,3.8,2.8,40.3,3.2)
+Gdansk <- c(464.3,818.8,168.1,127.9,40.2,0,10.2,124.3,102,19,8.1)
+Gdynia <- c(246.3,399.8,63.4,46,15.2,2.2,3,33.9,28.8,26.5,14.1)
+Gliwice <- c(181.3,430,40.5,18.8,14.6,7.1,0,24.2,13.5,16.3,5.3)
+Gorzow_Wlkp <- c(124.3,295,50,16.4,31.7,1.9,4.2,9.7,9,32.5,3.4)
+Grudziadz <- c(92.1,235,58.1,16.6,40.3,1.1,2.8,28.3,12.6,24.4,4.05)
+Kalisz <- c(101.6,311.6,47.3,22.1,25.2,0,3.8,0.9,0.4,42.8,15.5)
+Katowice <- c(296.3,552,68,28,40,0,7,23,16,36,3)
+Kielce <- c(196.8,380,52.8,26.3,19,7.5,1.7,30.6,23.8,22.2,2.5)
+Koszalin <- c(107.7,230,77.8,41,34.7,2.2,0.55,38.9,26.1,39.9,14.8)
+Krakow <- c(767.3,3135.2,165.4,149,16,0,17.7,110,104.5,NA,NA)
+Lublin <-c(339.8,582.7,153.8,99.8,53.1,0.9,26.6,8,6.7,117.5,64.8)
+Lodz <- c(690.4,1036.9,197.2,99.1,53.5,2.3,33.3,NA,NA,NA,NA)
+
+Olsztyn <- c(173.1,346.2,68.9,28.3,30.6,10,1.5,52.9,26.3,16.5,0.5)
+Opole <- c(128.1,403,85.8,32.5,53.9,1.3,1.4,13.2,7.9,70.9,23.1)
+Plock <- c(120.8,273,63.2,54.4,5.5,0,1.6,59.9,54.4,1.7,0)
+Poznan <- c(538.6,1053,232.1,126,NA,NA,16,98.2,70,85.6,40)
+Radom <- c(214.6,332,79.4,71.3,7.1,0,7.8,57.3,54.3,13.4,11.4)
+Ruda_Slaska <- c(138.3,261,27.8,10.6,16.5,0.7,4.5,20,9.4,3.7,0.8)
+Rybnik <- c(139.1,445.2,38.5,22.2,12.3,4,4.3,9.4,5.1,22.5,10.5)
+Rzeszow <- c(189.7,321.1,140.5,119.9,20.6,0,1.6,85.5,85.5,51,28)
+Slupsk <- c(91.5,154.8,45.1,31,24.1,9.1,2.4,22.8,15.1,20,3.5)
+Sosnowiec <- c(204,367,60,45,15,0,0,45,35,10,5)
+Szczecin <- c(403.9,792.5,135.3,69.7,58.2,7.4,20.4,91.9,NA)
+Tarnow <- c(109.6,366,67.1,10,57.1,0,2.75,23.4,5.2,43.7,4.8)
+Torun <- c(202.6,481.7,111,89.5,18.3,3.2,2,90,76,19,13.5)
+Tychy <- c(128.2,300,50,20.1,29.9,0,1.35,17.4,5.1,32.8,15)
+Warszawa <- c(1764.6,2433.5,522,336,185,1,34.9,416.4,266.4,70.7,35.4)
+Wroclawek <- c(111.8,219.9,54,15.7,32.4,5.8,0.78,11.5,8.6,42.6,7.1)
+Wroclaw <- c(638.6,2209,345.7,185,97.7,63,29.5,175.4,108.7,74.7,44.1)
+Zabrze <- c(174.3,220.2,23.6,18.5,5.2,0,1.3,7.7,7.2,14.6,10)
+Zielona_Gora <- c(139.8,471,62.8,21.9,33.2,7.7,3,4.7,4.7,58.1,7.2)
+
+dane <- rbind(Bialystok,Bielsko_Biala,Bydgoszcz,Bytom, Chorzow, Czestochowa, Dabrowa_Gornicza, Elblag, Gdansk, Gdynia, Gliwice, Gorzow_Wlkp, Grudziadz, Kalisz, Katowice, Kielce, Koszalin, Krakow, Lublin, Lodz, Olsztyn, Opole, Plock, Poznan, Radom, Ruda_Slaska, Rybnik, Rzeszow, Slupsk, Sosnowiec, Szczecin, Tarnow, Torun, Tychy, Warszawa, Wroclawek, Wroclaw, Zabrze, Zielona_Gora)
+
+dane <- as.data.frame(dane)
+
+colnames(dane) <-c("Ludzie","Dlugosc.drog","DIR.lacznie","DIR.asfalt","DIR.kostka","DIR.inne","Pasy.ruchu","Drogi.row.lacznie","Drogi.row.asfalt","Ciagi.lacznie","Ciagi.asfalt")
+```
+
+Jeœli chodzi o uzupe³nianie brakuj¹cych obserwacji, których nie ma tak du¿o, wykorzystam korelacjê. Poka¿ê to na przyk³adzie obliczania DIR z kostki/p³yt chodnikowych dla Poznania. Na pocz¹tku tworzê macierz korelacji, aby zobaczyæ, która ze zmiennych jest wysoko korelowana ze zmienn¹ DIR.kostka.  
+```{r}
+COR <- cor(dane[,1:11], use = "pairwise.complete.obs")
+image(x=seq(nrow(COR)), y=seq(ncol(COR)), z=cor(dane[,1:11], use = "pairwise.complete.obs"), axes=F, xlab="", ylab="")
+text(expand.grid(x=seq(dim(COR)[1]), y=seq(dim(COR)[2])), labels=round(c(COR),2))
+box()
+axis(1, at=seq(nrow(COR)), labels = rownames(COR), las=2)
+axis(2, at=seq(ncol(COR)), labels = colnames(COR), las=1)
+```
+
+Mo¿na zauwa¿yæ wysok¹ korelacjê miêdzy zmienn¹ DIR.kostka a DIR.lacznie (0.88). Poznañ posiada tê wartoœæ, wiêc tworzê wykres, na którym zestawiê te dwie wartoœci, a nastêpnie wyrysujê liniê modelu liniowego oraz zaznaczê wartoœæ DIR.lacznie dla Poznania.
+```{r}
+plot(dane$DIR.lacznie,dane$DIR.kostka)
+abline(lm(dane$DIR.kostka ~ dane$DIR.lacznie), col="blue")
+abline(v=126)
+```
+
+Kolejnym krokiem jest u¿ycie funkcji locator(), po której w³¹czeniu mam mo¿liwoœæ zaznaczenia punktu na wykresie. Zaznaczam punkt przeciêcia dwóch linii, nastêpnie koñczê funkcjê, a ta w konsoli wypisuje koordynaty punktu. Wartoœæ "y" wpisujê jako d³ugoœæ DIR z kostki dla miasta Poznañ. Poni¿ej wypisujê uzupe³nione wartoœci:
+```{r}
+dane["Poznan","DIR.kostka"] <- 86.7
+#Dla DIR.inne pos³u¿y³em siê œredni¹, gdy¿ zachodzi zbyt niska korelacja
+dane["Poznan","DIR.inne"] <- 19.6
+dane["Lodz","Drogi.row.lacznie"] <- 134.4
+dane["Szczecin","Drogi.row.asfalt"] <- 65.7
+dane["Lodz","Drogi.row.asfalt"] <- 71.7
+
+#Wstawiam œredni¹, zmienna posiada nisk¹ korelacjê z innymi zmiennymi. Wyj¹tek to Szczecin,
+#który posiada brak tylko w jednej z tych dwóch wartoœci (te dwie zmienne s¹ wysoko skorelowane)
+dane[is.na(dane[,"Ciagi.lacznie"]) == TRUE,"Ciagi.lacznie"] <- round(mean(dane$Ciagi.lacznie, na.rm = TRUE),1)
+dane["Szczecin","Ciagi.asfalt"] <- 5.8
+dane[is.na(dane[,"Ciagi.asfalt"]) == TRUE,"Ciagi.asfalt"] <- round(mean(dane$Ciagi.asfalt, na.rm = TRUE),1)
+```
+
+Teraz, gdy dane s¹ kompletne, nale¿y poddaæ je transformacji, aby nie braæ do tworzenia rankingu wartoœci bezwzglêdnych i nie faworyzowaæ du¿ych miast. Wiêkszoœæ zmiennych przekszta³cam jako wyliczenie, ile razy wiêcej udzia³u ma w DIR ni¿ pozosta³e zmienne wchodz¹ce w jej sk³ad.  
+```{r}
+#dane[,3] - ³¹czna d³ugoœæ DIR, dane[,2] - d³ugoœæ dróg publicznych
+dane[,4] <- dane[,4]/(dane[,3]-dane[,4])
+dane[,5] <- dane[,5]/(dane[,3]-dane[,5])
+dane[,6] <- dane[,6]/(dane[,3]-dane[,6])
+dane[,7] <- dane[,7]/(dane[,3]-dane[,7])
+for (i in 1:nrow(dane)){
+  if(dane[i,9] == dane[i,8]){
+    dane[i,9] <- 1
+  }
+  else{
+    dane[i,9] <- dane[i,9]/(dane[i,8]-dane[i,9])
+  }
+}
+dane[,8] <- dane[,8]/(dane[,3]-dane[,8])
+dane[,11] <- dane[,11]/(dane[,10]-dane[,11])
+dane[,10] <- dane[,10]/(dane[,3]-dane[,10])
+dane[,3] <- dane[,3]/dane[,2]
+```
+
+Po uzupe³nieniu danych oraz ich przekszta³ceniu mo¿na przejœæ do tworzenia rankingu.
+
+###Metoda Hellwiga
+
+Na pocz¹tku poddam dane standaryzacji i stworzê ramkê danych, która bêdzie zawieraæ obliczenia dla rankingu metod¹ Hellwiga.  
+```{r}
+danee <- dane
+for (i in 1:ncol(danee)){
+  danee[,i] <- (danee[,i] - mean(danee[,i]))/sd(danee[,i])
+}
+
+dane2 <- data.frame(matrix(NA,nrow=39,ncol=10))
+```
+
+Postanowi³em na dane na³o¿yæ wagi. Ciê¿ko by³oby ustaliæ je metod¹ eksperck¹, gdy¿ zmiennych nie jest ma³o, a ja sam nie jestem specjalist¹ w zakresie infrastruktury rowerowej. Dlatego te¿ za wagi pos³u¿y³ mi wspó³czynnik zmiennoœci.  
+```{r}
+wagi <- c(rep(NA, 9))
+for (i in 1:9){
+  wagi[i] <- sd(dane[,i])/mean(dane[,i])
+}
+suma_wag <- sum(wagi)
+```
+
+Policzê teraz odchylenia od wzorca dla ka¿dej ze zmiennej. W moim zbiorze s¹ 3 destymulanty: d³ugoœæ DIR z kostki i d³ugoœæ DIR z innej nawierzchni (najlepszy materia³ na DIR to asfalt) oraz ³¹czna d³ugoœæ ci¹gów pieszo-rowerowych (jest to najgorsza dla rowerzystów mo¿liwoœæ zrealizowania DIR).  
+```{r}
+for (i in 1:nrow(dane)){
+  dane2[i,1] <- (wagi[1]/suma_wag)*(danee[i,3] - max(danee[,3]))^2
+  dane2[i,2] <- (wagi[2]/suma_wag)*(danee[i,4] - max(danee[,4]))^2
+  dane2[i,3] <- (wagi[3]/suma_wag)*(danee[i,5] - min(danee[,5]))^2
+  dane2[i,4] <- (wagi[4]/suma_wag)*(danee[i,6] - min(danee[,6]))^2
+  dane2[i,5] <- (wagi[5]/suma_wag)*(danee[i,7] - max(danee[,7]))^2
+  dane2[i,6] <- (wagi[6]/suma_wag)*(danee[i,8] - max(danee[,8]))^2
+  dane2[i,7] <- (wagi[7]/suma_wag)*(danee[i,9] - max(danee[,9]))^2
+  dane2[i,8] <- (wagi[8]/suma_wag)*(danee[i,10] - min(danee[,10]))^2
+  dane2[i,9] <- (wagi[9]/suma_wag)*(danee[i,11] - max(danee[,11]))^2
+  dane2[i,10] <- sqrt(sum(dane2[i,1:9]))
+}
+```
+
+W kolejnym kroku policzê wspó³czynnik Hellwiga oraz przedstawiê finalny ranking.  
+```{r}
+d0 <- mean(dane2[,10]) + 2*sd(dane2[,10])
+dane2[,10] <- 1 - dane2[,10]/d0
+rownames(dane2) <- c("Bialystok", "Bielsko_Biala", "Bydgoszcz", "Bytom", "Chorzow", "Czestochowa", "Dabrowa_Gornicza", "Elblag", "Gdansk", "Gdynia", "Gliwice", "Gorzow_Wlkp", "Grudziadz", "Kalisz", "Katowice", "Kielce", "Koszalin", "Krakow", "Lublin", "Lodz", "Olsztyn", "Opole", "Plock", "Poznan", "Radom", "Ruda_Slaska", "Rybnik", "Rzeszow", "Slupsk", "Sosnowiec", "Szczecin", "Tarnow", "Torun", "Tychy", "Warszawa", "Wroclawek", "Wroclaw", "Zabrze", "Zielona_Gora")
+
+colnames(dane2)[10] <- "Hellwig"
+
+dane2 <- dane2[rev(order(dane2$Hellwig)),]
+print(dane2[,"Hellwig", drop=FALSE])
+```
+
+Metoda Hellwiga na najlepsze miasta pod wzglêdem DIR wskaza³a Radom, P³ock oraz Bia³ystok. Najgorsze miasta wed³ug tej metody to Zielona Góra, Elbl¹g oraz Kalisz.  
+
+###Metoda standaryzowanych sum
+
+Na pocz¹tku zamieniam destymulanty na stymulanty. Do modelu wykorzystam ten sam system wag, co w metodzie Hellwiga, wiêc nie wprowadzam go ponownie. Dane zestandaryzujê.
+```{r}
+dane3 <- dane
+dane3[,5] <- -dane[,5]
+dane3[,6] <- -dane[,6]
+dane3[,10] <- -dane[,10]
+
+#Usuwam liczbê ludnoœci i d³ugoœæ dróg publicznych
+dane3 <- dane3[,-c(1,2)]
+
+for (i in 1:ncol(dane3)){
+  dane3[,i] <- (dane3[,i] - mean(dane3[,i]))/sd(dane3[,i])
+}
+```
+
+Sumujê rangi, a nastêpnie je standaryzujê. Zaraz potem przedstawiê ranking miast.
+```{r}
+for (i in 1:nrow(dane3)){
+  dane3[i,10] <- sum(dane3[i,1:9]*(wagi/suma_wag))
+}
+
+for (i in 1:nrow(dane3)){
+  dane3[i,11] <- (dane3[i,10] - min(dane3[,10]))/max(dane3[,10] - min(dane3[,10]))
+}
+
+colnames(dane3)[11] <- "Wskaznik"
+dane3 <- dane3[rev(order(dane3$Wskaznik)),]
+print(dane3[,"Wskaznik", drop=FALSE])
+```
+
+Mo¿na zauwa¿yæ, ¿e nie zmieni³ siê koniec rankingu. Miasta z najgorsz¹ DIR to wci¹¿ Zielona Góra, Elbl¹g oraz Kalisz. Zmieni³a siê nieco pierwsza trójka: na trzecim miejscu zamiast Bia³egostoku znalaz³ siê Kraków.
+
+###Metoda sumy rang
+
+Na pocz¹tku zamieniam stymulanty na destymulanty i standaryzujê wszystkie zmienne, tworzê tak¿e ramkê danych na rangi.
+```{r}
+dane5 <- dane
+dane5[,c(1:4,7:9,11)] <- -dane5[,c(1:4,7:9,11)]
+
+for (i in 1:ncol(dane5)){
+  dane5[,i] <- (dane5[,i] - mean(dane5[,i]))/sd(dane5[,i])
+}
+
+dane4 <- data.frame(matrix(NA,nrow=39,ncol=9))
+
+rownames(dane4) <- c("Bialystok","Bielsko_Biala","Bydgoszcz","Bytom", "Chorzow", "Czestochowa", "Dabrowa_Gornicza", "Elblag", "Gdansk", "Gdynia", "Gliwice", "Gorzow_Wlkp", "Grudziadz", "Kalisz", "Katowice", "Kielce", "Koszalin", "Krakow", "Lublin", "Lodz", "Olsztyn", "Opole", "Plock", "Poznan", "Radom", "Ruda_Slaska", "Rybnik", "Rzeszow", "Slupsk", "Sosnowiec", "Szczecin", "Tarnow", "Torun", "Tychy", "Warszawa", "Wroclawek", "Wroclaw", "Zabrze", "Zielona_Gora")
+
+```
+
+Przed wyœwietleniem rankingu nale¿y jeszcze zestandaryzowaæ zmienne oraz utworzyæ zmienn¹ pozwalaj¹c¹ na useregowanie miast.
+```{r}
+for (i in 1:ncol(dane4)){
+  dane4[,i] <- rank(dane5[,i+2])
+}
+
+dane4[,10] <- NULL
+
+for (i in 1:nrow(dane4)){
+  dane4[i,10] <- mean(as.numeric(dane4[i,1:9]))
+}
+
+colnames(dane4)[10] <- "Suma rang"
+
+dane4 <- dane4[order(dane4$'Suma rang'),]
+print(dane4[,"Suma rang", drop=FALSE])
+```
+
+W pierwszej trójce ponownie znalaz³a siê ca³a czo³ówka z rankingu wykonanego metod¹ Hellwiga, chocia¿ kolejnoœæ jest nieco inna. Na pierwszym miejscu znów jest Radom, ale drugie miejsce zajmuje Bia³ystok, a trzecie P³ock. Najgorsze miasta w rankingu to Zielona Góra, Tarnów (po raz pierwszy w ostatniej trójce) oraz Elbl¹g.
+
+###Podsumowanie
+
+Miastami o najlepszej DIR okaza³y siê: **Radom**, **P³ock** oraz **Bia³ystok**. Mo¿na zauwa¿yæ, ¿e Radom wygra³ spor¹ przewag¹. W metodzie sumy rang osi¹gn¹³ wynik 5.22, podczas gdy srebrny medalista tego zestawienia, Bia³ystok, posiada³ wskaŸnik na poziomie 10.22. W pozosta³ych metodach blisko Radomia znajdowa³ siê P³ock i oba te miasta znacz¹co odbiega³y poziomem od pozosta³ych miast. W metodzie Hellwiga wartoœci wspó³czynników to 0.46-0.45-0.36 dla 3 pierwszych miejsc, a w metodzie standaryzowanych sum 1-0.93-0.74 (tu te¿ najlepiej widaæ przewagê Radomia i P³ocka). We wszystkich zestawieniach wysoko znajduje siê Kraków, który osi¹gn¹³by mo¿e lepszy wynik, gdyby nie przedostatnia lokata dla ³¹cznej d³ugoœci DIR. Ani razu nie opuœci³ pierwszej dziesi¹tki, a w metodzie standaryzowanych sum znalaz³ siê na podium, zdobywaj¹c trzecie miejsce. Jeœli chodzi o przyczyny zwyciêstwa Radomia, nie zaj¹³ on ani razu pierwszego miejsca w danej kategorii (wyj¹tek stanowi d³ugoœæ DIR z innej nawierzchni, gdzie wiele miast zdoby³o ex aequo pierwsze miejsce), aczkolwiek zawsze znajdowa³ siê wysoko i nieraz zajmowa³ drugie miejsce (np. pod wzglêdem d³ugoœci DIR z kostki). Pod wzglêdem liczby zdobytych z³otych medali lepiej prezentuje siê P³ock, który m.in. znacz¹co wyprzedzi³ konkurencjê przy ³¹cznej d³ugoœæ dróg rowerowych (P³ock - 18.15, zdobywca drugiego miejsca (Bia³ystok) - 4.69). Nie trzyma³ siê on jednak tak œciœle najlepszych lokat, bêd¹c np. na ostatnim miejscu dla asfaltowych ci¹gów pieszo-rowerowych. 
+  
+Jeœli chodzi o drugi koniec tabeli, zajê³y go nastêpuj¹ce miasta: **Zielona Góra**, **Elbl¹g** oraz **Kalisz**. Podczas gdy w metodzie sumy rang nie widaæ znacz¹cego odstawania w porównaniu do innych miast o najgorszej DIR, pozwala to dostrzec ju¿ metoda Hellwiga. Zielona Góra jako jedyna uzyska³a wspó³czynnik poni¿ej zera, odstaj¹c o ponad 0.04 od drugiego najwiêkszego przegranego, Elbl¹ga. Ró¿nicê pozwala dostrzec te¿ metoda standaryzowanych sum. Dwa ostatnie miejsca w rankingu (Zielona Góra oraz Elbl¹g) plasuj¹ siê na koñcu ze wskaŸnikami 0 i 0.12, a trzecie od koñca miejsce ma ten wskaŸnik na poziomie 0.2. Czemu Zielona Góra wystêpuje zawsze na samym koñcu, osi¹gaj¹c najgorsze wyniki spoœród wszystkich miast? Przyczyn¹ jest z pewnoœci¹ ostatnia pozycja tego miasta w ³¹cznej d³ugoœci ci¹gów rowerowych. Poza t¹ zmienn¹, Zielona Góra raz tylko uplasowa³a siê w koñcowej trójce. Jednak zmienna, gdzie Zielona Góra znalaz³a siê na ostatnim miejscu, posiada najwiêksz¹ wagê spoœród wszystkich zmiennych, a samo miasto znacz¹co odstaje od pozosta³ych konkurentów. Co ciekawe, koñcówka rankingu dla tej zmiennej wygl¹da tak samo jak koñcówka ogólnego rankingu (brak podobnej zale¿noœci dla pocz¹tku rankingu). Wszystkie z tych miast mocno odbiegaj¹ od reszty (Zielona Góra - 12.36, Kalisz - 9.51, Elbl¹g - 8.4, miasto z 4 miejsca - 4.76).  
+
+#Rozdzia³ II: Grupowanie obiektów
+###Wprowadzenie
+
+Celem tej czêœci projektu bêdzie przedstawienie rankingu polskich miast najbardziej przyjaznych rowerzystom.  
+**Dane: **Dane, podobnie jak w poprzedniej czêœci, pochodz¹ z magazynu rowerowego "Rowertour" (11/2018), gdzie zosta³ przedstawiony ranking miast najbardziej przyjaznych rowerzystom. 
+Jeœli chodzi o iloœæ miast, dla których wykonywany bêdzie ranking, postanowi³em pozostawiæ oryginaln¹ ich liczbê - 39, co nie odbiega sporo od wymienionej w zadaniu liczby 30. Zestaw danych zosta³ wprowadzony ju¿ w poprzedniej czêœci projektu, tam te¿ zosta³ poddany transformacji, dlatego w tej czêœci projektu nie bêdê robi³ tego ponownie.    
+**Metodologia: **Zmuszony jestem ograniczyæ liczbê zmiennych, których w danych mo¿na naliczyæ doœæ sporo. Analizê ograniczê do drogowej infrastruktury rowerowej (DIR), w sk³ad której wchodz¹ nastêpuj¹ce zmienne (s - stymulanta, d - destymulanta):  
+-*DIR.lacznie:* £¹czna d³ugoœæ DIR (s)  
+-*DIR.asfalt:* D³ugoœæ DIR o powierzchni asfaltowej (s)  
+-*DIR.kostka:* D³ugoœæ DIR o powierzchni z kostki/p³yt chodnikowych (d)  
+-*DIR.inne:* D³ugoœæ DIR o innej powierzchni (d)  
+-*Pasy.ruchu:* £¹czna d³ugoœæ pasów ruchu dla rowerów (s)  
+-*Drogi.row.lacznie:* £¹czna d³ugoœæ dróg dla rowerów (s)  
+-*Drogi.row.asfalt:* D³ugoœæ dróg dla rowerów o powierzchni asfaltowej (s)  
+-*Ciagi.lacznie:* £¹czna d³ugoœæ ci¹gów pieszo-rowerowych (d)  
+-*Ciagi.asfalt:* D³ugoœæ ci¹gów pieszo-rowerowych o powierzchni asfaltowej (s)   
+
+###Grupowanie podzia³owe
+
+Grupowanie podzia³owe pozwoli na zbadanie, które z miast maj¹ zbli¿on¹ do siebie drogow¹ infrastrukturê rowerow¹. Mo¿e siê okazaæ, ¿e miasta bêd¹ siê grupowaæ wg ich wielkoœci, co by³oby s³abym rozwi¹zaniem. Mam nadziejê, ¿e przekszta³cenie danych, które dokona³em w poprzedniej czêœci, wp³ynie pozytywnie na rozró¿nienie miast przy grupowaniu.  
+Zanim wykonam grupowanie podzia³owe, zbadam, czy dane nadaj¹ siê do analizy skupieñ. W tym celu jeszcze raz narysujê macierz korelacji.
+Aby zobaczyæ, czy nie zachodzi wspó³liniowoœæ, ponownie narysujê macierz korelacji.
+```{r}
+#Usuniêcie z danych zmiennych dotycz¹cych liczby ludnoœci oraz d³ugoœci dróg publicznych - z tymi danymi miasta przyporz¹dkowa³oby pod wzglêdem ich wielkoœci
+dane <- dane[,-c(1,2)]
+
+COR <- cor(dane[,1:9])
+image(x=seq(nrow(COR)), y=seq(ncol(COR)), z=cor(dane[,1:9]), axes=F, xlab="", ylab="")
+text(expand.grid(x=seq(dim(COR)[1]), y=seq(dim(COR)[2])), labels=round(c(COR),2))
+box()
+axis(1, at=seq(nrow(COR)), labels = rownames(COR), las=2)
+axis(2, at=seq(ncol(COR)), labels = colnames(COR), las=1)
+```
+
+W ¿adnym przypadku nie zachodzi nierównoœæ |r| > 0.9. Ma na to wp³yw przetransformowanie zmiennych, gdy¿ dla surowych danych takich korelacji by³o doœæ sporo. Pozostaje zbadaæ jeszcze wspó³czynnik zmiennoœci. 
+```{r}
+for (i in 1:9){
+  print(paste(colnames(dane)[i], ": ", (sd(dane[,i])/mean(dane[,i]))*100, sep=''))
+}
+```
+
+Równie¿ i ten warunek jest spe³niony, dla ¿adnej ze zmiennych wspó³czynnik nie spada poni¿ej 10%.  
+Za³o¿enia s¹ spe³nione, wiêc poddam teraz dane normalizacji, do czego wykorzystam standaryzacjê.
+```{r}
+for (i in 1:ncol(dane)){
+  dane[,i] <- (dane[,i] - mean(dane[,i]))/sd(dane[,i])
+}
+```
+
+Sprawdziæ nale¿y, czy nie ma wartoœci odstaj¹cych (<-3 lub >3).
+```{r}
+summary(dane)
+```
+
+Okazuje siê, ¿e istniej¹ outliery (zmienne DIR.kostka, Drogi.row.lacznie, Drogi.row.asfalt, Ciagi.lacznie oraz Ciagi.asfalt). Postanowi³em jednak nic z nimi nie robiæ. Dane przedstawiaj¹ DIR w wybranych miastach i naturalnym jest, ¿e któreœ miasto mo¿e byæ w jednej cesze znacznie lepsze lub gorsze wzglêdem innych i daleko odstawaæ na tym polu (np. przypadek Zielonej Góry w I czêœci projektu).  
+Wykonam teraz grupowanie podzia³owe trzema metodami: metod¹ k-œrednich, algorytmem PAM (opartym o metodê k-medoid) oraz algorytmem CLARA (oparty równie¿ o metodê k-medoid, bazuj¹cy jednak na reprezentatywnej próbie).  
+
+##Metoda k-œrednich
+
+**UWAGA!** Nie wiem dlaczego, ale podczas tworzenia pliku HTML wykres ten uleg³ zmianie i nie mogê go przywróciæ do porz¹dku. Za ka¿dym razem inaczej wykonuje porz¹dkowanie. W ostatecznym wyniku jest dok³adnie ten sam kod i daje on w³aœciwy rezultat, wiêc komentarz pod ni¿ej wykonanym wykresem odnosi siê do wykresu wykonanego póŸniej, przy podaniu najlepszego wyniku.  
+
+Liczbê skupieñ na podstawie prób ustali³em na liczbê 4, która moim zdaniem najlepiej ukazuje ró¿nice miêdzy miastami: grupy nie przecinaj¹ siê, ³atwo jest o interpretacjê.  
+```{r, warning=FALSE, message=FALSE}
+library(factoextra)
+```
+
+```{r}
+xx <- kmeans(dane, 4, iter.max = 10)
+fviz_cluster(xx, data = dane)
+```
+Metoda ta dobrze komponuje siê z rankingiem wykonanym przeze mnie w pierwszym rozdziale. Wykres dobrze przedstawia zró¿nicowanie miast.  
+
+##Algorytm PAM
+
+W przypadku odleg³oœci euklidesowej, za najlepsz¹ liczbê skupieñ ustali³em liczbê 5, bo przy liczbie 4 powstaje zbyt du¿a grupa, w której sk³ad wchodzi grupa czerwona i zielona.
+```{r, warning=FALSE, message=FALSE}
+library(cluster)
+xx <- pam(dane, 5, metric = "euclidean")
+fviz_cluster(xx, data = dane)
+```
+
+Wykres jest mniej czytelny ni¿ jego poprzednik, wydaje siê, ¿e grupa fioletowa oraz oliwkowa s¹ niepotrzebne, gdy¿ nie wydaj¹ siê byæ odrêbne od reszty. Grupy te jednak utrzymaj¹ siê bez wzglêdu na to, jak¹ liczbê da siê liczbê do algorytmu.   
+W przypadku odleg³oœci miejskiej, wróci³em do liczby 4, gdy¿ liczba 5 jest zbyt du¿a, wykres jest mniej czytelny.
+```{r}
+xx <- pam(dane, 4, metric = "manhattan")
+fviz_cluster(xx, data = dane)
+```
+
+Grupa fioletowa zawiera grupê niebiesk¹, co nie wygl¹da przejrzyœcie. Dobrze z kolei zosta³y rozdzielone miasta w dolnym lewym rogu.
+
+##Algorytm CLARA
+
+Podobnie jak przy algorytmie PAM, tutaj te¿ ustawi³em liczbê 5. Liczbê reprezentatywnej próby ustali³em na 20, gdy¿ od 25-30 wykres dla tego algorytmu wygl¹da identycznie jak wykres dla algorytmu PAM.
+```{r}
+xx <- clara(dane, 5, metric = "euclidean", samples = 5, sampsize = 20)
+fviz_cluster(xx, data = dane)
+```
+
+Niepokoi przemieszanie grup fioletowej, czerwonej oraz zielonej. Ca³kiem sensowne wydaj¹ siê byæ grupa oliwkowa oraz grupa niebieska.  
+Dla odleg³oœci miejskiej najlepiej prezentuje siê liczba 3, chocia¿ klastry s¹ i tak przemieszane i trudno jest o przejrzystoœæ wykresu.  
+```{r}
+xx <- clara(dane, 3, metric = "manhattan", samples = 5, sampsize = 20)
+fviz_cluster(xx, data = dane)
+```
+
+##Podobieñstwa i ró¿nice
+
+Na pierwszy rzut oka widaæ, ¿e dla ka¿dej z metod ustali³em inn¹ liczbê grup. Wynika to st¹d, ¿e ka¿dy algorytm bazuje na czymœ innym, wiêc trudno o z góry okreœlon¹ liczbê, która najlepiej zadzia³a dla wszystkich algorytmów. Problemem jest te¿ czytelnoœæ. S¹ wykresy, z których ciê¿ko jest wyczytaæ, do której grupy nale¿y miasto.  
+Za najlepsze metody dla moich danych uwa¿am metodê k-œrednich oraz algorytm PAM z odleg³oœci¹ euklidesow¹. Finalnie do analizy zdecydowa³em siê wzi¹æ metodê k-œrednich.  
+
+##Omówienie ostatecznego wyniku
+
+```{r}
+xx <- kmeans(dane, 4, iter.max = 10)
+fviz_cluster(xx, data = dane)
+```
+
+Mo¿na zauwa¿yæ, ¿e miasta nie s¹ grupowane wzglêdem ich wielkoœci, w pojedynczym klastrze mo¿na znaleŸæ zarówno jedno z miast aglomeracyjnych, jak i mniejsze miasta (np. Kraków i Zabrze w pierwszej grupie).  
+Poni¿ej sprawdzê, czym charakteryzuj¹ siê dane podgrupy.
+
+```{r}
+podsumowanie <- data.frame(matrix(NA, nrow = 9, ncol = 4))
+for (i in 1:4){
+  for (j in 1:9){
+    podsumowanie[j,i] <- lapply(dane[names(which(xx$cluster == i)),], mean)[[j]]
+  }
+  round(podsumowanie[,i],2)
+}
+colnames(podsumowanie) <- c(1:4)
+rownames(podsumowanie) <- colnames(dane)
+print(podsumowanie)
+```
+
+**Pierwsza grupa: **Doœæ dobra infrastruktura, jednak najmniej rozwiniêta w stosunku do wielkoœci ca³ego miasta: s³abo rozwiniêta DIR, jeœli chodzi o jej ³¹czn¹ d³ugoœæ; du¿y udzia³ pasów ruchu w ogólnej infrastrukturze rowerowej; ma³y udzia³ ci¹gów pieszo-rowerowych w DIR.  
+**Druga grupa: **Najlepsza DIR, chocia¿ niezbyt rozwiniêta wielkoœciowo - udzia³ dróg z asfaltu jest tu najwiêkszy, ma³o jest dróg z kostki i innych surowców; du¿o dróg rowerowych (w tym tak¿e tych asfaltowych); ma³o ci¹gów pieszo-rowerowych (jeœli siê takie pojawiaj¹, s¹ czêsto wykonane z asfaltu).  
+**Trzecia grupa: **Najlepiej rozwiniêta wielkoœciowo DIR, jednak o niezbyt dobrej jakoœci; najwiêkszy udzia³ dróg z innego surowca w DIR; najmniejszy udzia³ pasów ruchu i doœæ ma³a d³ugoœæ dróg rowerowych, które zastêpowane s¹ przez ci¹gi pieszo-rowerowe.  
+**Czwarta grupa: **Obejmuje tylko 2 miasta, posiadaj¹ one najs³absz¹ jakoœciowo DIR; najmniej dróg z asfaltu i du¿a iloœæ dróg z kostki, a to zapewne z powodu najwiêkszego udzia³u ci¹gów pieszo-rowerowych w DIR; najmniejsza d³ugoœæ dróg rowerowych  
+  
+Podsumowuj¹c, grupy mo¿na opisaæ nastêpuj¹co:  
+**Pierwsza grupa: **Doœæ dobre warunki jazdy, jednak zdecydowanie za ma³o rozwiniêta infrastruktura.  
+**Druga grupa: **Najlepsze warunki do jazdy, jednak nie za bardzo jest gdzie pojeŸdziæ.  
+**Trzecia grupa: **Niezbyt dobre warunki jazdy, za to mo¿na bezproblemowo poruszaæ siê rowerem po ca³ym mieœcie.  
+**Czwarta grupa: **Najgorsze warunki jazdy, jednak mo¿na rowerem zwiedziæ wiêkszy kawa³ek miasta.  
+To, jaka grupa jest najlepsza, zale¿y od naszych preferencji, jednak najbardziej optymalne warunki jazdy panuj¹ moim zdaniem w miastach z grupy trzeciej. Nale¿y pamiêtaæ, ¿e gorsza jakoœæ infrastruktury nie oznacza, ¿e drogi s¹ pe³ne dziur, a krawê¿niki s¹ bardzo wysokie - gorsz¹ infrastruktur¹ z punktu widzenia ca³oœci DIR s¹ np. ci¹gi pieszo-rowerowe, które jednak same w sobie nie s¹ tak z³ym rozwi¹zaniem lda rekreacyjnej jazdy.  
+
+###Grupowanie hierarchiczne
+
+Zajmê siê teraz grupowaniem hierarchicznym, które, tak jak i grupowanie podzia³owe, pozwoli na zbadanie, które z miast maj¹ zbli¿on¹ do siebie drogow¹ infrastrukturê rowerow¹. W poprzedniej czêœci odesz³y obawy dotycz¹ce tego, ¿e miasta grupowaæ siê bêd¹ wzglêdem wielkoœci. Zosta³y równie¿ sprawdzone za³o¿enia dobrego grupowania, a dane zosta³y zestandaryzowane. Tym samym mo¿na pomin¹æ t¹ czêœæ i przyst¹piæ od razu do grupowania hierarchicznego.  
+Na pocz¹tku wybiorê standardow¹ funkcjê odleg³oœci - odleg³oœæ euklidesow¹, a nastêpnie stworzê dendogramy dla kilku metod.  
+
+```{r, fig.show='hold', out.width='50%'}
+plot(hclust(dist(dane),"single"), main = "Metoda najbli¿szego s¹siada")
+plot(hclust(dist(dane),"complete"), main = "Metoda najdalszego s¹siada")
+plot(hclust(dist(dane),"centroid"), main = "Metoda centroidalna")
+plot(hclust(dist(dane),"ward.D"), main = "Metoda Warda")
+```
+
+Moim zdaniem, zarówno metoda najbli¿szego s¹siada jak i metoda centroidalna maj¹ zbyt du¿o skupisk, przez co wykres jest ma³o czytelny i liczba powsta³ych grup jest zbyt du¿a. Znacznie lepiej prezentuje siê metoda najdalszego s¹siada oraz metoda Warda, w których ³atwo jest wydzieliæ powsta³e grupy.  
+Zamieniê teraz funkcjê odleg³oœci z euklidesowej na miejsk¹.
+```{r, fig.show='hold', out.width='50%'}
+plot(hclust(dist(dane, method = "manhattan"),"single"), main = "Metoda najbli¿szego s¹siada")
+plot(hclust(dist(dane, method = "manhattan"),"complete"), main = "Metoda najdalszego s¹siada")
+plot(hclust(dist(dane, method = "manhattan"),"centroid"), main = "Metoda centroidalna")
+plot(hclust(dist(dane, method = "manhattan"),"ward.D"), main = "Metoda Warda")
+```
+
+Sytuacja wygl¹da podobnie jak przy metodzie euklidesowej, ponownie dwie metody s¹ czytelne, a dwie nie. Zmienia siê podzia³ jeœli chodzi o wiêksze grupy, jednak w mniejszych grupach wygl¹da to podobnie.  
+Trzeci¹ z miar odleg³oœci bêdzie odleg³oœæ Minkowskiego (dla p = 3).
+```{r, fig.show='hold', out.width='50%'}
+plot(hclust(dist(dane, method = "minkowski", p = 3),"single"), main = "Metoda najbli¿szego s¹siada")
+plot(hclust(dist(dane, method = "minkowski", p = 3),"complete"), main = "Metoda najdalszego s¹siada")
+plot(hclust(dist(dane, method = "minkowski", p = 3),"centroid"), main = "Metoda centroidalna")
+plot(hclust(dist(dane, method = "minkowski", p = 3),"ward.D"), main = "Metoda Warda")
+```
+
+Wydaje siê, ¿e odleg³oœæ Minkowskiego jest najgorsza spoœród wszystkich, ka¿dy z wykresóW jest doœæ mocno spiêtrzony, przez co trudno jest wydzieliæ pojedyñcze grupy.  
+
+##Podobieñstwa i ró¿nice
+
+Jak to ju¿ zosta³o wspomniane, pokazane metody mo¿na podzieliæ na te ³atwe do pogrupowania (metoda najdalszego s¹siada oraz Warda), jak i te, w których miasta s¹ mocno spiêtrzone (metoda najbli¿szego s¹siada i centroidalna). To s¹ w³aœnie ró¿nice i podobieñstwa, które wp³ywaj¹ na to, któr¹ metodê uznaæ za lepsz¹. Pod wzglêdem u¿ytych miar odleg³oœci, poza odleg³oœci¹ Minkowskiego, która daje spiêtrzone dendogramy, nie ma sporej ró¿nicy w klasyfikacji miast. Na potrzeby projektu zdecydowa³em siê na metodê Warda (czêœciej stosowana w praktyce ni¿ metoda najdalszego s¹siada) oraz standardow¹ odleg³oœæ euklidesow¹.  
+
+##Omówienie ostatecznego wyniku
+
+```{r}
+plot(hclust(dist(dane),"ward.D"), main = "Metoda Warda")
+```
+
+Mo¿na zauwa¿yæ, ¿e podobnie jak przy analizie podzia³owej, nie ma problemu ³¹czenia siê du¿ych miast w jedn¹ grupê. Mamy np. w jednej grupie Wroc³aw oraz Rybnik, a miasta te znacz¹co siê od siebie ró¿ni¹ liczb¹ mieszkañców jak i d³ugoœci¹ dróg.  
+Jeœli chodzi o liczbê skupieñ, moim zdaniem odpowiednia liczba to 6, a ciêcie by³oby wykonane w okolicy liczby 8, zaraz po tym, jak P³ock do³¹czy do grupy Bielsko-Bia³ej, Krakowa oraz Radomia. Najliczniejsz¹ z grup by³aby wtedy grupa najbardzie po prawej, od Grudzi¹dza do Krakowa. Zauwa¿yæ mo¿na, ¿e najbardziej od reszty odstaj¹ P³ock, Bielsko Bia³a, Kraków oraz Radom. Pokrywa siê to z wykonanym wczeœniej wykresem grupowania podzia³owego, gdzie miasta te by³y po³o¿one najbardziej na lewo. Nie tylko w tym aspekcie przejawia siê podobieñstwo wzglêdem wczeœniejszego wykresu. Widaæ, ¿e czêsto grupuj¹ siê ze sob¹ miasta, które by³y blisko siebie przy wykresie k-means (w jednej, najmniejszej grupie s¹ np. Elbl¹g oraz Tarnów, które razem stanowi³y osobny klaster). Na dendogramie widaæ, ¿e miastami, które najbardziej odstaj¹ od reszty, s¹ miasta najlepsze oraz najgorsze zarówno z rankingu w I czêœci, jak i w analizie podzia³owej oraz na samym wykresie, gdzie zajmuj¹ pozycje najbardziej na lewo oraz najbardziej na prawo.  
+
+###Podsumowanie
+
+Mo¿na zauwa¿yæ, ¿e dzia³aj¹c ró¿nymi metodami mo¿na dojœæ do podobnych wniosków. Daje siê wy³oniæ miasta, które s¹ najlepsze dla rowerzystów, jak i takie, które s¹ dla nich najgorsze. Kluczem jest jednak wybór odpowiedniej metody jak i dobór np. miary odleg³oœci, które choæ zbli¿one, mog¹ daæ odmienne rezultaty.
